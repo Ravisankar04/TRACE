@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cinzel, Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { Providers } from "@/components/providers";
 import "./globals.css";
@@ -31,6 +31,9 @@ export const metadata: Metadata = {
   title: "TRACE — Temporal Web Intelligence",
   description:
     "TRACE continuously monitors websites, reconstructs their history, detects meaningful changes, and explains them with evidence.",
+};
+
+export const viewport: Viewport = {
   themeColor: "#000000",
 };
 

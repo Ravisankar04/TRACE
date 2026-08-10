@@ -20,7 +20,7 @@ export default function PortfolioPage() {
             Live Demo
           </Link>
           <a
-            href="https://github.com"
+            href="https://github.com/Ravisankar04/TRACE"
             className="rounded-full border border-white/15 px-7 py-3 text-[11px] uppercase tracking-[0.28em] text-white/80"
           >
             GitHub
