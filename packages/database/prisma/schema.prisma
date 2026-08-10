@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  active
+  paused
+  scanning
+  error
+}
+
+enum ChangeType {
+  PRICE_CHANGE
+  FEATURE_ADDED
+  FEATURE_REMOVED
+  CONTENT_ADDED
+  CONTENT_REMOVED
+  POLICY_CHANGE
+  DOCUMENTATION_CHANGE
+  PRODUCT_LAUNCH
+  TEAM_CHANGE
+  CONTACT_CHANGE
+  DESIGN_CHANGE
+  TECHNICAL_CHANGE
+  UNKNOWN
+}
+
+enum ChangeSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum JobStatus {
+  queued
+  running
+  completed
+  failed
+  retrying
+  dead
+}
+
+enum InvestigationStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum GraphEntityType {
+  Company
+  Product
+  Feature
+  Person
+  Announcement
+  Page
+  Document
+  PricingPlan
+  Change
+  Event
+}
+
+enum GraphRelationType {
+  OWNS
+  HAS_FEATURE
+  MENTIONS
+  PUBLISHED
+  CHANGED
+  RELATED_TO
+  WORKS_AT
+  REMOVED
+  ADDED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions       Session[]
+  projects       Project[]
+  apiKeys        ApiKey[]
+  webhooks       Webhook[]
+  investigations Investigation[]
+  auditLogs      AuditLog[]
+
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ip        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Project {
+  id        String        @id @default(cuid())
+  userId    String
+  name      String
+  rootUrl   String
+  status    ProjectStatus @default(active)
+  crawlDepth Int          @default(2)
+  pageLimit  Int          @default(25)
+  lastScanAt DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pages          Page[]
+  snapshots      Snapshot[]
+  changes        Change[]
+  events         Event[]
+  investigations Investigation[]
+  jobs           JobRecord[]
+  graphEntities  GraphEntity[]
+  graphEdges     GraphEdge[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Page {
+  id           String    @id @default(cuid())
+  projectId    String
+  url          String
+  canonicalUrl String?
+  title        String?
+  depth        Int       @default(0)
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  snapshots Snapshot[]
+  changes   Change[]
+
+  @@unique([projectId, url])
+  @@index([projectId])
+  @@index([url])
+}
+
+model Snapshot {
+  id                String   @id @default(cuid())
+  projectId         String
+  pageId            String
+  url               String
+  fetchedAt         DateTime @default(now())
+  statusCode        Int
+  contentType       String?
+  title             String?
+  normalizedContent String
+  contentHash       String
+  rawStorageKey     String?
+  metadata          Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  page    Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  previousChanges Change[] @relation("PreviousSnapshot")
+  currentChanges  Change[] @relation("CurrentSnapshot")
+  evidence        Evidence[]
+
+  @@index([projectId, fetchedAt])
+  @@index([pageId, fetchedAt])
+  @@index([contentHash])
+  @@index([url])
+}
+
+model Change {
+  id                 String         @id @default(cuid())
+  projectId          String
+  pageId             String
+  previousSnapshotId String?
+  currentSnapshotId  String
+  type               ChangeType
+  severity           ChangeSeverity
+  summary            String
+  confidence         Float
+  rawDiff            Json?
+  semanticDiff       Json?
+  createdAt          DateTime       @default(now())
+
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  page             Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  previousSnapshot Snapshot? @relation("PreviousSnapshot", fields: [previousSnapshotId], references: [id], onDelete: SetNull)
+  currentSnapshot  Snapshot  @relation("CurrentSnapshot", fields: [currentSnapshotId], references: [id], onDelete: Cascade)
+  evidence         Evidence[]
+  events           Event[]
+
+  @@index([projectId, createdAt])
+  @@index([pageId])
+  @@index([type])
+  @@index([severity])
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  projectId String
+  changeId  String?
+  title     String
+  type      String
+  occurredAt DateTime @default(now())
+  metadata  Json?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  change  Change? @relation(fields: [changeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, occurredAt])
+}
+
+model Investigation {
+  id        String              @id @default(cuid())
+  projectId String?
+  userId    String
+  question  String
+  status    InvestigationStatus @default(pending)
+  answer    Json?
+  confidence Float?
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  project  Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidence Evidence[]
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+}
+
+model Evidence {
+  id              String   @id @default(cuid())
+  investigationId String?
+  changeId        String?
+  snapshotId      String?
+  label           String
+  excerpt         String
+  rank            Float    @default(0)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  investigation Investigation? @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  change        Change?        @relation(fields: [changeId], references: [id], onDelete: SetNull)
+  snapshot      Snapshot?      @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+
+  @@index([investigationId])
+  @@index([changeId])
+  @@index([snapshotId])
+}
+
+model JobRecord {
+  id          String    @id @default(cuid())
+  projectId   String?
+  queueName   String
+  bullJobId   String?
+  type        String
+  status      JobStatus @default(queued)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  priority    Int       @default(0)
+  reason      String?
+  payload     Json?
+  result      Json?
+  nextRetryAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([projectId])
+  @@index([bullJobId])
+  @@index([type])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  secret    String
+  events    String[]
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  webhookId    String
+  event        String
+  payload      Json
+  statusCode   Int?
+  success      Boolean  @default(false)
+  attempts     Int      @default(0)
+  lastError    String?
+  createdAt    DateTime @default(now())
+  deliveredAt  DateTime?
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  prefix     String
+  keyHash    String    @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String?
+  resourceId String?
+  ip        String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action])
+}
+
+model GraphEntity {
+  id        String          @id @default(cuid())
+  projectId String
+  type      GraphEntityType
+  name      String
+  metadata  Json?
+  createdAt DateTime        @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  outEdges GraphEdge[] @relation("FromEntity")
+  inEdges  GraphEdge[] @relation("ToEntity")
+
+  @@index([projectId, type])
+  @@unique([projectId, type, name])
+}
+
+model GraphEdge {
+  id           String            @id @default(cuid())
+  projectId    String
+  fromEntityId String
+  toEntityId   String
+  type         GraphRelationType
+  metadata     Json?
+  createdAt    DateTime          @default(now())
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromEntity GraphEntity @relation("FromEntity", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity   GraphEntity @relation("ToEntity", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@unique([projectId, fromEntityId, toEntityId, type])
+}
+
+model ContentBlob {
+  id          String   @id @default(cuid())
+  contentHash String   @unique
+  size        Int
+  storageKey  String
+  createdAt   DateTime @default(now())
+
+  @@index([contentHash])
+}

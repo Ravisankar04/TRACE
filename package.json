@@ -1,0 +1,37 @@
+{
+  "name": "trace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TRACE — Temporal Web Intelligence Engine. See how the internet changes.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build:packages && concurrently -n web,api,worker -c peach,cyan,magenta \"npm run dev -w @trace/web\" \"npm run dev -w @trace/api\" \"npm run dev -w @trace/worker\"",
+    "build:packages": "npm run build -w @trace/shared && npm run build -w @trace/config && npm run build -w @trace/database && npm run build -w @trace/diff-engine && npm run build -w @trace/crawler && npm run build -w @trace/ai",
+    "dev:web": "npm run dev -w @trace/web",
+    "dev:api": "npm run dev -w @trace/api",
+    "dev:worker": "npm run dev -w @trace/worker",
+    "build": "npm run build -w @trace/shared && npm run build -w @trace/config && npm run build -w @trace/database && npm run build -w @trace/diff-engine && npm run build -w @trace/crawler && npm run build -w @trace/ai && npm run build -w @trace/api && npm run build -w @trace/worker && npm run build -w @trace/web",
+    "db:generate": "npm run generate -w @trace/database",
+    "db:migrate": "npm run migrate -w @trace/database",
+    "db:seed": "npm run seed -w @trace/database",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run test:e2e -w @trace/web",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0 || true",
+    "typecheck": "tsc -b --pretty false || true",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
