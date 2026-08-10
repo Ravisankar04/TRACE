@@ -4,6 +4,10 @@
 
 > See how the internet changes.
 
+**Live:** [trace-gilt-gamma.vercel.app](https://trace-gilt-gamma.vercel.app)  
+**GitHub:** [Ravisankar04/TRACE](https://github.com/Ravisankar04/TRACE)  
+**Portfolio page:** [/portfolio](https://trace-gilt-gamma.vercel.app/portfolio)
+
 TRACE continuously monitors websites, stores historical snapshots, detects meaningful changes, reconstructs website history, and explains those changes with **evidence-backed** AI investigations.
 
 This is a portfolio-grade full-stack system — not a fake SaaS wrapper. Every metric, timeline event, diff, and investigation claim is produced by real crawls, real storage, and real analysis.
